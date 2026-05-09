@@ -6,6 +6,16 @@ import { useState } from "react";
 
 import { supabase } from "@/lib/supabase";
 
+function getAuthRedirectUrl() {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "");
+
+  if (configuredSiteUrl) {
+    return configuredSiteUrl;
+  }
+
+  return typeof window === "undefined" ? undefined : window.location.origin;
+}
+
 export function SignUpForm() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
@@ -26,7 +36,7 @@ export function SignUpForm() {
     const { error: signUpError } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        emailRedirectTo: typeof window === "undefined" ? undefined : window.location.origin
+        emailRedirectTo: getAuthRedirectUrl()
       }
     });
 
