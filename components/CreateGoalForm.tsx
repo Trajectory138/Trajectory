@@ -5,7 +5,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import type { Goal, GoalStatus } from "@/lib/models";
+import { getCurrentWeekStartDate } from "@/lib/executionTracking";
+import type { Goal, GoalStatus, Milestone, WeeklyAction } from "@/lib/models";
 import { useGoalCalendarData } from "@/lib/useGoalCalendarData";
 
 const statusOptions: Array<{ value: GoalStatus; label: string }> = [
@@ -28,20 +29,34 @@ function createGoalId(title: string) {
 
 export function CreateGoalForm() {
   const router = useRouter();
-  const { addGoal } = useGoalCalendarData();
+  const { addGoal, addMilestones, addWeeklyActions } = useGoalCalendarData();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [whyItMatters, setWhyItMatters] = useState("");
   const [targetDate, setTargetDate] = useState("");
   const [status, setStatus] = useState<GoalStatus>("active");
-  const [errors, setErrors] = useState<{ title?: string; targetDate?: string }>({});
+  const [milestoneTitle, setMilestoneTitle] = useState("");
+  const [milestoneDescription, setMilestoneDescription] = useState("");
+  const [milestoneDueDate, setMilestoneDueDate] = useState("");
+  const [firstMoveTitle, setFirstMoveTitle] = useState("");
+  const [firstMoveDescription, setFirstMoveDescription] = useState("");
+  const [errors, setErrors] = useState<{
+    title?: string;
+    targetDate?: string;
+    milestoneTitle?: string;
+    milestoneDueDate?: string;
+  }>({});
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const wantsFirstMove = Boolean(firstMoveTitle.trim());
+    const wantsMilestone = Boolean(milestoneTitle.trim() || milestoneDescription.trim() || milestoneDueDate);
     const nextErrors = {
       title: title.trim() ? undefined : "Goal title is required.",
-      targetDate: targetDate ? undefined : "Target date is required."
+      targetDate: targetDate ? undefined : "Target date is required.",
+      milestoneTitle: wantsFirstMove && !milestoneTitle.trim() ? "Add a milestone before scheduling a move." : undefined,
+      milestoneDueDate: wantsMilestone && !milestoneDueDate && !targetDate ? "Milestone due date is required." : undefined
     };
 
     setErrors(nextErrors);
@@ -62,6 +77,44 @@ export function CreateGoalForm() {
     };
 
     addGoal(goal);
+    const firstMilestone: Milestone | undefined = milestoneTitle.trim()
+      ? {
+          id: createGoalId(`${title}-milestone-${milestoneTitle}`),
+          goalId: id,
+          title: milestoneTitle.trim(),
+          description: milestoneDescription.trim() || "First milestone for this goal.",
+          dueDate: milestoneDueDate || targetDate,
+          completed: false,
+          successCriteria: ["Milestone is complete"],
+          blockers: [],
+          nextStep: firstMoveTitle.trim() || "Choose the next concrete step."
+        }
+      : undefined;
+
+    if (firstMilestone) {
+      addMilestones([firstMilestone]);
+    }
+
+    if (firstMilestone && firstMoveTitle.trim()) {
+      const firstMove: WeeklyAction = {
+        id: createGoalId(`${title}-move-${firstMoveTitle}`),
+        goalId: id,
+        milestoneId: firstMilestone.id,
+        title: firstMoveTitle.trim(),
+        description: firstMoveDescription.trim() || "First move for this goal.",
+        weekStartDate: getCurrentWeekStartDate(),
+        completed: false,
+        estimatedTime: "30 minutes",
+        priority: "medium",
+        energyLevel: "medium",
+        notes: "Added from the create goal flow.",
+        activeWeek: true,
+        weekLocked: true
+      };
+
+      addWeeklyActions([firstMove]);
+    }
+
     router.push(`/goals/${id}`);
   }
 
@@ -148,6 +201,88 @@ export function CreateGoalForm() {
               </select>
             </label>
           </div>
+
+          <section className="rounded-lg border border-line bg-paper p-4">
+            <div>
+              <h2 className="text-base font-semibold">First milestone</h2>
+              <p className="mt-1 text-sm text-ink/60">
+                Add the first checkpoint so this goal can move from idea to execution.
+              </p>
+            </div>
+            <div className="mt-4 grid gap-4">
+              <label className="block">
+                <span className="text-sm font-medium">Milestone title</span>
+                <input
+                  value={milestoneTitle}
+                  onChange={(event) => setMilestoneTitle(event.target.value)}
+                  aria-invalid={Boolean(errors.milestoneTitle)}
+                  aria-describedby={errors.milestoneTitle ? "milestone-title-error" : undefined}
+                  placeholder="e.g. Build the first working version"
+                  className="mt-2 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-leaf"
+                />
+                {errors.milestoneTitle ? (
+                  <p id="milestone-title-error" className="mt-2 text-sm text-clay">{errors.milestoneTitle}</p>
+                ) : null}
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium">Milestone description</span>
+                <textarea
+                  value={milestoneDescription}
+                  onChange={(event) => setMilestoneDescription(event.target.value)}
+                  rows={3}
+                  className="mt-2 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-leaf"
+                />
+              </label>
+
+              <label className="block sm:max-w-xs">
+                <span className="text-sm font-medium">Due date</span>
+                <input
+                  type="date"
+                  value={milestoneDueDate}
+                  onChange={(event) => setMilestoneDueDate(event.target.value)}
+                  aria-invalid={Boolean(errors.milestoneDueDate)}
+                  aria-describedby={errors.milestoneDueDate ? "milestone-due-date-error" : undefined}
+                  className="mt-2 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-leaf"
+                />
+                {errors.milestoneDueDate ? (
+                  <p id="milestone-due-date-error" className="mt-2 text-sm text-clay">{errors.milestoneDueDate}</p>
+                ) : (
+                  <p className="mt-2 text-xs text-ink/50">If blank, the goal target date will be used.</p>
+                )}
+              </label>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-line bg-paper p-4">
+            <div>
+              <h2 className="text-base font-semibold">First move</h2>
+              <p className="mt-1 text-sm text-ink/60">
+                Schedule one concrete action for this week so it can appear in Today’s Move.
+              </p>
+            </div>
+            <div className="mt-4 grid gap-4">
+              <label className="block">
+                <span className="text-sm font-medium">Move title</span>
+                <input
+                  value={firstMoveTitle}
+                  onChange={(event) => setFirstMoveTitle(event.target.value)}
+                  placeholder="e.g. Draft the homepage outline"
+                  className="mt-2 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-leaf"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium">Move details</span>
+                <textarea
+                  value={firstMoveDescription}
+                  onChange={(event) => setFirstMoveDescription(event.target.value)}
+                  rows={3}
+                  className="mt-2 w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-leaf"
+                />
+              </label>
+            </div>
+          </section>
 
           <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:items-center">
             <button
