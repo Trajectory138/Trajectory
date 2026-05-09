@@ -6,11 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { EmptyState } from "@/components/EmptyState";
 import { getDaysUntilDate, parseGoalDate } from "@/lib/dateProgress";
 import {
-  getCurrentStreak,
-  getCurrentWeekStartDate,
-  getExecutionLogForDate,
-  getTodayDateKey,
-  hasExecutionHistory
+  getCurrentWeekStartDate
 } from "@/lib/executionTracking";
 import { getGoalTrajectory } from "@/lib/trajectory";
 import { useGoalCalendarData } from "@/lib/useGoalCalendarData";
@@ -49,20 +45,18 @@ export function Dashboard() {
     milestones,
     getWeeklyActionsWithLabels,
     getMilestonesForGoal,
-    setWeeklyActionCompleted,
-    executionLogs
+    setWeeklyActionCompleted
   } = useGoalCalendarData();
   const [executionNote, setExecutionNote] = useState("");
   const [completedMoves, setCompletedMoves] = useState<CompletedMove[]>([]);
   const [recentlyCompletedMoveId, setRecentlyCompletedMoveId] = useState<string | undefined>(undefined);
+  const [showMoveDetails, setShowMoveDetails] = useState(false);
   const [showMoveLogged, setShowMoveLogged] = useState(false);
   const moveLoggedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const moveAdvanceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const today = getTodayAtNoon();
   const todayLabel = formatFullDate(today);
   const weekStartDate = getCurrentWeekStartDate(today);
-  const todayDate = getTodayDateKey(today);
-  const todayLog = getExecutionLogForDate(executionLogs, todayDate);
   const weeklyActionsWithLabels = getWeeklyActionsWithLabels();
   const currentWeekActions = weeklyActionsWithLabels.filter((action) => action.weekStartDate === weekStartDate);
   const scheduledActions = currentWeekActions.length > 0 ? currentWeekActions : weeklyActionsWithLabels;
@@ -85,14 +79,6 @@ export function Dashboard() {
   const hasTargetDate = Boolean(parseGoalDate(targetDate));
   const daysRemaining = hasTargetDate ? Math.max(getDaysUntilDate(targetDate, today), 0) : undefined;
   const trajectory = goal ? getGoalTrajectory(goal, goalMilestones, today) : undefined;
-  const storedCurrentStreak = getCurrentStreak(executionLogs, todayDate);
-  const storedTodayCompletedCount = todayLog?.completedCount ?? 0;
-  const completedMoveAlreadyCounted = Boolean(
-    todayMove && todayLog?.completedActionIds.includes(todayMove.id)
-  );
-  const hasOptimisticCompletion = isTodayMoveCompleted && !completedMoveAlreadyCounted;
-  const currentStreak = storedCurrentStreak + (hasOptimisticCompletion && storedTodayCompletedCount === 0 ? 1 : 0);
-  const todayCompletedCount = storedTodayCompletedCount + (hasOptimisticCompletion ? 1 : 0);
   const trajectoryStyle = trajectory ? trajectoryStyles[trajectory.status] : trajectoryStyles["on-track"];
 
   function markTodayMoveComplete() {
@@ -153,6 +139,10 @@ export function Dashboard() {
     };
   }, []);
 
+  useEffect(() => {
+    setShowMoveDetails(false);
+  }, [todayMove?.id]);
+
   const executionNoteField = (
     <label className="mt-4 block max-w-2xl">
       <span className="text-sm font-medium">What moved forward today?</span>
@@ -164,46 +154,6 @@ export function Dashboard() {
         placeholder="Add a quick note about today’s progress."
       />
     </label>
-  );
-
-  const executionStatusStrip = (
-    <section className="rounded-lg border border-line bg-white p-2.5 shadow-sm sm:px-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-2 rounded-md border border-line bg-paper px-2.5 py-1.5">
-            <span className="text-[11px] font-semibold uppercase text-ink/60">Current streak</span>
-            <span className={`inline-flex items-center gap-1 text-sm font-semibold ${currentStreak > 0 ? "text-success" : "text-ink"}`}>
-              <span aria-hidden="true" className="text-xs leading-none">🔥</span>
-              <span>
-                {currentStreak > 0 ? "+ " : ""}
-                {currentStreak} days
-              </span>
-            </span>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-md border border-line bg-paper px-2.5 py-1.5">
-            <span className="text-[11px] font-semibold uppercase text-ink/60">Tasks completed</span>
-            <span className="inline-flex items-center gap-1 text-sm font-semibold text-ink">
-              <span aria-hidden="true" className="text-xs leading-none">✓</span>
-              <span>{todayCompletedCount}</span>
-            </span>
-          </div>
-        </div>
-        <p
-          className={`min-h-5 text-sm font-semibold text-leaf transition-opacity duration-300 ${
-            showMoveLogged ? "opacity-100" : "opacity-0"
-          }`}
-          aria-live="polite"
-        >
-          Move completed
-        </p>
-      </div>
-
-      {!hasExecutionHistory(executionLogs) ? (
-        <p className="mt-2 text-sm text-ink/60">
-          Complete one meaningful action today to begin your execution history.
-        </p>
-      ) : null}
-    </section>
   );
 
   const completedMovesSection = completedMoves.length > 0 ? (
@@ -240,7 +190,6 @@ export function Dashboard() {
   if (goals.length === 0) {
     return (
       <main className="space-y-6">
-        {executionStatusStrip}
         <section className="rounded-lg border border-line bg-white p-6 shadow-sm">
           <EmptyState
             headline="🚀 Start your first mission"
@@ -258,7 +207,6 @@ Create one to begin tracking progress and building momentum."
   if (!todayMove || !goal) {
     return (
       <main className="space-y-6">
-        {executionStatusStrip}
         <section className="rounded-lg border border-line bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold uppercase text-leaf">Today&apos;s Move</p>
           <p className="mt-2 text-sm text-ink/60">{todayLabel}</p>
@@ -294,22 +242,29 @@ You can:
 
   return (
     <main className="space-y-6">
-      {executionStatusStrip}
       <section className="rounded-lg border border-line border-l-4 border-l-leaf bg-successSoft/40 p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold uppercase text-leaf">Today&apos;s Move</p>
-            <p className="mt-2 text-sm text-ink/60">{todayLabel}</p>
-            <h1 className="mt-3 text-2xl font-semibold sm:text-4xl">{todayMove.title}</h1>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-ink/70">
-              One focused action for the current week. Finish this before reaching for the next thing.
-            </p>
-            {executionNoteField}
+        <p
+          className={`mb-3 min-h-5 text-sm font-semibold text-leaf transition-opacity duration-300 ${
+            showMoveLogged ? "opacity-100" : "opacity-0"
+          }`}
+          aria-live="polite"
+        >
+          Move completed
+        </p>
+        <div className="min-w-0">
+          <p className="text-sm font-semibold uppercase text-leaf">Today&apos;s Move</p>
+          <p className="mt-2 text-sm text-ink/60">{todayLabel}</p>
+          <h1 className="mt-3 text-2xl font-semibold sm:text-4xl">{todayMove.title}</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-ink/70">
+            One focused action for the current week. Finish this before reaching for the next thing.
+          </p>
+          {executionNoteField}
+          <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={markTodayMoveComplete}
               disabled={isTodayMoveCompleted}
-              className={`mt-3 inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold shadow-sm transition ${
+              className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold shadow-sm transition ${
                 isTodayMoveCompleted
                   ? "cursor-default bg-success text-white"
                   : "bg-leaf text-white hover:bg-ink"
@@ -317,45 +272,76 @@ You can:
             >
               {isTodayMoveCompleted ? "Completed ✔" : "Mark complete"}
             </button>
-          </div>
-
-          <div className="w-full shrink-0 rounded-lg border border-line/70 bg-white/50 p-4 lg:max-w-xs">
-            <div>
-              <p className="text-[11px] font-medium uppercase text-ink/50">Goal</p>
-              <Link href={`/goals/${goal.id}`} className="mt-1 block text-sm font-semibold text-ink/80 transition hover:text-leaf">
-                {goal.title}
-              </Link>
-            </div>
-            <div className="mt-3 border-t border-line/70 pt-3">
-              <p className="text-[11px] font-medium uppercase text-ink/50">Milestone</p>
-              {milestone ? (
-                <Link
-                  href={`/goals/${goal.id}/milestones/${milestone.id}`}
-                  className="mt-1 block text-sm font-semibold text-ink/80 transition hover:text-leaf"
-                >
-                  {milestone.title}
-                </Link>
-              ) : (
-                <p className="mt-1 text-sm font-semibold text-ink/60">Unknown milestone</p>
-              )}
-            </div>
-            <div className="mt-3 border-t border-line/70 pt-3">
-              <p className="text-[11px] font-medium uppercase text-ink/50">Days remaining</p>
-              {daysRemaining === undefined ? (
-                <p className="mt-1 text-sm font-semibold text-ink/60">No target date</p>
-              ) : (
-                <p className="mt-1 text-xl font-semibold text-ink/80">{daysRemaining}</p>
-              )}
-            </div>
-            <div className="mt-3 border-t border-line/70 pt-3">
-              <p className="text-[11px] font-medium uppercase text-ink/50">Trajectory</p>
-              <p className={`mt-1 inline-flex rounded-md border px-2 py-1 text-xs font-semibold ${trajectoryStyle}`}>
-                {trajectory?.label ?? "On track"}
-              </p>
-              <p className="mt-1 text-sm text-ink/60">{trajectory?.message ?? "You are aligned with plan"}</p>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowMoveDetails((current) => !current)}
+              className="inline-flex items-center justify-center rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-ink/70 transition hover:border-leaf hover:text-leaf"
+              aria-expanded={showMoveDetails}
+            >
+              Details
+            </button>
           </div>
         </div>
+
+        {showMoveDetails ? (
+          <div className="mt-5 rounded-lg border border-line bg-white/70 p-4">
+            <div className="flex flex-col gap-1 border-b border-line pb-3">
+              <p className="text-xs font-semibold uppercase text-leaf">Move details</p>
+              <p className="text-sm leading-6 text-ink/70">{todayMove.description}</p>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="text-[11px] font-medium uppercase text-ink/50">Goal</p>
+                <Link
+                  href={`/goals/${goal.id}`}
+                  className="mt-1 block text-base font-semibold text-ink transition hover:text-leaf"
+                >
+                  {goal.title}
+                </Link>
+                <p className="mt-2 text-sm leading-6 text-ink/60">{goal.description}</p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase text-ink/50">Milestone</p>
+                {milestone ? (
+                  <>
+                    <Link
+                      href={`/goals/${goal.id}/milestones/${milestone.id}`}
+                      className="mt-1 block text-base font-semibold text-ink transition hover:text-leaf"
+                    >
+                      {milestone.title}
+                    </Link>
+                    <p className="mt-2 text-sm leading-6 text-ink/60">{milestone.description}</p>
+                  </>
+                ) : (
+                  <p className="mt-1 text-sm font-semibold text-ink/60">Unknown milestone</p>
+                )}
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase text-ink/50">Days remaining</p>
+                {daysRemaining === undefined ? (
+                  <p className="mt-1 text-sm font-semibold text-ink/60">No target date</p>
+                ) : (
+                  <>
+                    <p className="mt-1 text-2xl font-semibold text-ink">{daysRemaining}</p>
+                    <p className="mt-1 text-sm text-ink/60">
+                      Until {milestone?.dueDate ? "milestone due date" : "goal target date"}
+                    </p>
+                  </>
+                )}
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase text-ink/50">Trajectory</p>
+                <p className={`mt-1 inline-flex rounded-md border px-2 py-1 text-sm font-semibold ${trajectoryStyle}`}>
+                  {trajectory?.label ?? "On track"}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-ink/60">
+                  {trajectory?.message ?? "You are aligned with plan"}
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {upNext.length > 0 ? (
