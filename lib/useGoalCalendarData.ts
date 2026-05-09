@@ -15,6 +15,17 @@ import {
   goalCalendarStorageKey,
   type GoalCalendarData
 } from "@/lib/storage";
+import {
+  deleteGoalFromSupabase,
+  deleteMilestoneFromSupabase,
+  deleteWeeklyActionFromSupabase,
+  fetchGoalCalendarDataFromSupabase,
+  replaceSupabaseGoalCalendarData,
+  upsertExecutionLogsInSupabase,
+  upsertGoalsInSupabase,
+  upsertMilestonesInSupabase,
+  upsertWeeklyActionsInSupabase
+} from "@/lib/supabaseGoalCalendar";
 import type { Goal, Milestone, WeeklyAction } from "@/lib/models";
 
 function getDemoData(): GoalCalendarData {
@@ -110,8 +121,33 @@ export function useGoalCalendarData() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    setData(readStoredData());
-    setLoaded(true);
+    let isMounted = true;
+
+    async function loadData() {
+      const remoteData = await fetchGoalCalendarDataFromSupabase();
+      const hasRemoteData = Boolean(
+        remoteData?.goals.length || remoteData?.milestones.length || remoteData?.weeklyActions.length
+      );
+      const nextData: GoalCalendarData = hasRemoteData && remoteData ? remoteData : readStoredData();
+
+      if (!isMounted) {
+        return;
+      }
+
+      setData({
+        goals: normalizeGoals(nextData.goals),
+        milestones: normalizeMilestones(nextData.milestones),
+        weeklyActions: normalizeWeeklyActions(nextData.weeklyActions),
+        executionLogs: normalizeExecutionLogs(nextData.executionLogs)
+      });
+      setLoaded(true);
+    }
+
+    void loadData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -135,6 +171,7 @@ export function useGoalCalendarData() {
     const demoData = getDemoData();
     setData(demoData);
     window.localStorage.setItem(goalCalendarStorageKey, JSON.stringify(demoData));
+    void replaceSupabaseGoalCalendarData(demoData);
     window.dispatchEvent(new Event(goalCalendarResetEvent));
   }, []);
 
@@ -148,6 +185,7 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void upsertMilestonesInSupabase(nextData.milestones.filter((milestone) => milestone.id === milestoneId));
       return nextData;
     });
   }, []);
@@ -185,6 +223,8 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void upsertWeeklyActionsInSupabase(nextData.weeklyActions.filter((action) => action.id === actionId));
+      void upsertExecutionLogsInSupabase(nextData.executionLogs);
       return nextData;
     });
   }, []);
@@ -197,6 +237,7 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void upsertGoalsInSupabase([goal]);
       return nextData;
     });
   }, []);
@@ -209,6 +250,7 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void upsertMilestonesInSupabase(milestones);
       return nextData;
     });
   }, []);
@@ -221,6 +263,7 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void upsertWeeklyActionsInSupabase([action]);
       return nextData;
     });
   }, []);
@@ -233,6 +276,7 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void upsertWeeklyActionsInSupabase(actions);
       return nextData;
     });
   }, []);
@@ -245,6 +289,7 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void deleteWeeklyActionFromSupabase(actionId);
       return nextData;
     });
   }, []);
@@ -257,6 +302,7 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void upsertGoalsInSupabase(nextData.goals.filter((goal) => goal.id === goalId));
       return nextData;
     });
   }, []);
@@ -271,6 +317,7 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void deleteGoalFromSupabase(goalId);
       return nextData;
     });
   }, []);
@@ -285,6 +332,7 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void upsertMilestonesInSupabase(nextData.milestones.filter((milestone) => milestone.id === milestoneId));
       return nextData;
     });
   }, []);
@@ -300,6 +348,7 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void deleteMilestoneFromSupabase(milestoneId);
       return nextData;
     });
   }, []);
@@ -314,6 +363,7 @@ export function useGoalCalendarData() {
       };
 
       saveStoredData(nextData);
+      void upsertWeeklyActionsInSupabase(nextData.weeklyActions.filter((action) => action.id === actionId));
       return nextData;
     });
   }, []);

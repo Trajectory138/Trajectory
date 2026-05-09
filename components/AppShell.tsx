@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { AuthButton } from "@/components/AuthButton";
+
 const navItems = [
   { href: "/", label: "Today" },
   { href: "/goals", label: "Goals" },
@@ -79,6 +81,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <GearIcon />
               </Link>
             </nav>
+            <AuthButton />
           </div>
         </div>
       </header>
