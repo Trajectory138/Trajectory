@@ -39,7 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Link href="/" className="text-lg font-semibold tracking-normal">
-              Trajectory
+              DoWhatNow
             </Link>
             <Link
               href="/goals/new"
