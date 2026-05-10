@@ -41,15 +41,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-paper text-ink">
       <header className="border-b border-line bg-white/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          
-          {/* Left: logo + create */}
+
+          {/* Left: logo + create (desktop only) */}
           <div className="flex items-center gap-3">
             <Link href="/" className="text-lg font-semibold tracking-normal">
               DoWhatNow
             </Link>
             <Link
               href="/goals/new"
-              className="inline-flex items-center justify-center rounded-md bg-leaf px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-ink focus:outline-none focus:ring-2 focus:ring-leaf focus:ring-offset-2"
+              className="hidden sm:inline-flex items-center justify-center rounded-md bg-leaf px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-ink focus:outline-none focus:ring-2 focus:ring-leaf focus:ring-offset-2"
             >
               + Create goal
             </Link>
@@ -101,9 +101,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     href={item.href}
                     onClick={() => setMenuOpen(false)}
                     className={`rounded-md px-3 py-2 text-sm transition hover:bg-paper ${
-                      isActive
-                        ? "font-semibold text-leaf"
-                        : "font-medium text-ink/60"
+                      isActive ? "font-semibold text-leaf" : "font-medium text-ink/60"
                     }`}
                   >
                     {item.label}
@@ -119,6 +117,15 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:py-8">{children}</main>
+
+      {/* Floating action button (mobile only) */}
+      <Link
+        href="/goals/new"
+        className="fixed bottom-6 right-6 flex sm:hidden items-center justify-center w-14 h-14 rounded-full bg-leaf text-white text-2xl shadow-lg hover:bg-ink transition focus:outline-none focus:ring-2 focus:ring-leaf focus:ring-offset-2"
+        aria-label="Create goal"
+      >
+        +
+      </Link>
     </div>
   );
 }
